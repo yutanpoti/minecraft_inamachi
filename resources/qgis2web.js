@@ -1,4 +1,35 @@
 
+isTracking = false;
+var geolocateControl = (function (Control) {
+    geolocateControl = function(opt_options) {
+        var options = opt_options || {};
+        var button = document.createElement('button');
+        button.className += ' fa fa-map-marker';
+        var handleGeolocate = function() {
+            if (isTracking) {
+                map.removeLayer(geolocateOverlay);
+                isTracking = false;
+          } else if (geolocation.getTracking()) {
+                map.addLayer(geolocateOverlay);
+                map.getView().setCenter(geolocation.getPosition());
+                isTracking = true;
+          }
+        };
+        button.addEventListener('click', handleGeolocate, false);
+        button.addEventListener('touchstart', handleGeolocate, false);
+        var element = document.createElement('div');
+        element.className = 'geolocate ol-unselectable ol-control';
+        element.appendChild(button);
+        ol.control.Control.call(this, {
+            element: element,
+            target: options.target
+        });
+    };
+    if (Control) geolocateControl.__proto__ = Control;
+    geolocateControl.prototype = Object.create(Control && Control.prototype);
+    geolocateControl.prototype.constructor = geolocateControl;
+    return geolocateControl;
+}(ol.control.Control));
 
 var container = document.getElementById('popup');
 var content = document.getElementById('popup-content');
@@ -20,7 +51,7 @@ var expandedAttribution = new ol.control.Attribution({
 
 var map = new ol.Map({
     controls: ol.control.defaults({attribution:false}).extend([
-        expandedAttribution
+        expandedAttribution,new geolocateControl()
     ]),
     target: document.getElementById('map'),
     renderer: 'canvas',
@@ -34,7 +65,7 @@ var map = new ol.Map({
 var layerSwitcher = new ol.control.LayerSwitcher({tipLabel: "Layers"});
 map.addControl(layerSwitcher);
 
-map.getView().fit([15356680.374937, 4278257.337085, 15358773.948397, 4279871.512646], map.getSize());
+map.getView().fit([15356436.075982, 4278251.102735, 15359155.947702, 4279890.691971], map.getSize());
 
 var NO_POPUP = 0
 var ALL_FIELDS = 1
@@ -348,6 +379,44 @@ map.on('singleclick', function(evt) {
 });
 
 
+
+      var geolocation = new ol.Geolocation({
+  projection: map.getView().getProjection()
+});
+
+
+var accuracyFeature = new ol.Feature();
+geolocation.on('change:accuracyGeometry', function() {
+  accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
+});
+
+var positionFeature = new ol.Feature();
+positionFeature.setStyle(new ol.style.Style({
+  image: new ol.style.Circle({
+    radius: 6,
+    fill: new ol.style.Fill({
+      color: '#3399CC'
+    }),
+    stroke: new ol.style.Stroke({
+      color: '#fff',
+      width: 2
+    })
+  })
+}));
+
+geolocation.on('change:position', function() {
+  var coordinates = geolocation.getPosition();
+  positionFeature.setGeometry(coordinates ?
+      new ol.geom.Point(coordinates) : null);
+});
+
+var geolocateOverlay = new ol.layer.Vector({
+  source: new ol.source.Vector({
+    features: [accuracyFeature, positionFeature]
+  })
+});
+
+geolocation.setTracking(true);
 
 
 var attributionComplete = false;
